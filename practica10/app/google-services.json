@@ -12,7 +12,12 @@
           "package_name": "mx.itson.practica10"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "2182047733-ieuj9kituinclflamovppr0419jrhmps.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBuUtNbB-NGx62MQhyDeNI9F3TqAhy7Uvw"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "2182047733-ieuj9kituinclflamovppr0419jrhmps.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

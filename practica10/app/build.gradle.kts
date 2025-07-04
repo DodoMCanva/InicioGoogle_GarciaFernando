@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "mx.itson.practica10"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -39,6 +39,8 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("com.google.firebase:firebase-auth:23.2.1")
+
+    implementation("com.google.android.gms:play-services-auth:20.1.0")
 
     implementation("androidx.credentials:credentials:1.2.0-alpha02")
     implementation("androidx.credentials:credentials-play-services-auth:1.0.0")

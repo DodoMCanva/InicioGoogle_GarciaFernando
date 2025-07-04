@@ -1,176 +1,76 @@
 package mx.itson.practica10
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Log
+import android.widget.Button
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
-import androidx.credentials.exceptions.GetCredentialException
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-
 
 class MainActivity : AppCompatActivity() {
 
-    object Global {
-        var preferencias_compartidas = "sharedpreferences"
-    }
+    private val RC_SIGN_IN = 9001
+    private lateinit var firebaseAuth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
-    }
 
-    fun verificar_sesion_abierta(){
-        var sesion_abierta : SharedPreferences = this.getSharedPreferences(
-            Global.preferencias_compartidas,
-            Context.MODE_PRIVATE
-        )
-        var correo = sesion_abierta.getString("Correo", null)
-        var proveedor = sesion_abierta.getString("Proveedor", null)
-        if (correo != null && proveedor != null) {
-            var intent = Intent(applicationContext, Bienvenida::class.java);
-            intent.putExtra("Correo", correo)
-            intent.putExtra("Proveedor", proveedor)
-            startActivity(intent)
-        }
-    }
+        firebaseAuth = FirebaseAuth.getInstance()
 
-    fun guardar_sesion(correo : String, proveedor : String){
-        var guardar_sesion : SharedPreferences.Editor = this.getSharedPreferences(
-            Global.preferencias_compartidas,
-            Context.MODE_PRIVATE
-        ).edit()
-        guardar_sesion.putString("Correo", correo)
-        guardar_sesion.putString("Proveedor", proveedor)
-        guardar_sesion.apply()
-        guardar_sesion.commit()
-    }
-
-    @SuppressLint("CoroutineCreationDuringComposition")
-    @Composable
-    fun loginGoogle() {
-        val context = LocalContext.current
-        val coroutineScope : CoroutineScope = rememberCoroutineScope()
-        val credentialManager = CredentialManager.create(context)
-
-        val signInWithGoogleOption : GetSignInWithGoogleOption =
-            GetSignInWithGoogleOption.Builder(getString(R.string.web_cliente))
-                .setNonce("nonce")
-                .build()
-
-        val request : GetCredentialRequest = GetCredentialRequest.Builder()
-            .addCredentialOption(signInWithGoogleOption)
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestEmail()
             .build()
 
-        coroutineScope.launch {
+        val mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        val account = GoogleSignIn.getLastSignedInAccount(this)
+        if (account != null) {
+            firebaseAuthWithGoogle(account)
+        }
+
+        findViewById<Button>(R.id.btnLoginGoogle).setOnClickListener {
+            val signInIntent = mGoogleSignInClient.signInIntent
+            startActivityForResult(signInIntent, RC_SIGN_IN)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == RC_SIGN_IN) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(data)
             try {
-                val result = credentialManager.getCredential(
-                    request = request,
-                    context = context
-                )
-                handleSignIn(result)
-            }catch (e : GetCredentialException){
-                Toast.makeText(
-                    applicationContext,
-                    "Error al obtener la credencias " + e,
-                    Toast.LENGTH_LONG
-                ).show()
+                val account = task.getResult(ApiException::class.java)
+                firebaseAuthWithGoogle(account)
+            } catch (e: ApiException) {
+                Log.w("GoogleSignIn", "Google sign in failed", e)
+                Toast.makeText(applicationContext, "Error al iniciar sesión con Google", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    fun handleSignIn(result: GetCredentialResponse) {
-        val credential = result.credential
-        when (credential) {
-            is CustomCredential -> {
-                if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                    try {
-                        val googleIdTokenCredential = GoogleIdTokenCredential
-                            .createFrom(credential.data)
-                        val crendencial =
-                            GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
+    private fun firebaseAuthWithGoogle(account: GoogleSignInAccount?) {
+        val credential = GoogleAuthProvider.getCredential(account?.idToken, null)
 
-                        FirebaseAuth.getInstance().signInWithCredential(crendencial)
-                            .addOnCompleteListener(this) { task ->
-                                if (task.isSuccessful) {
-                                    var intent = Intent(applicationContext, Bienvenida::class.java);
-                                    intent.putExtra("Correo", task.result.user?.email)
-                                    intent.putExtra("Proveedor", "Google")
-                                    startActivity(intent)
-                                    guardar_sesion(task.result.user?.email.toString(), "Google")
-                                } else {
-                                    Toast.makeText(
-                                        applicationContext,
-                                        "Error en la autenticacion con Firebase",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            }
-                    } catch (e : GoogleIdTokenParsingException) {
-                        Toast.makeText(
-                            applicationContext,
-                            "Usuario/Contrasenia incorrecto(s)",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                } else {
-                    Toast.makeText(
-                        applicationContext,
-                        "Usuario/Contrasenia incorrecto(s)",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-            else -> {
-                Toast.makeText(
-                    applicationContext,
-                    "Usuario/Contrasenia incorrecto(s)",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
-
-    fun login_firebase(correo : String, pass : String) {
-        FirebaseAuth.getInstance().signInWithEmailAndPassword(correo, pass)
+        firebaseAuth.signInWithCredential(credential)
             .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful){
-                    var intent = Intent(applicationContext, Bienvenida::class.java);
-                    intent.putExtra("Correo", task.result.user?.email)
-                    intent.putExtra("Proveedor", "Usuario/Contraseña")
+                if (task.isSuccessful) {
+                    val user = firebaseAuth.currentUser
+                    Toast.makeText(applicationContext, "Bienvenido ${user?.displayName}", Toast.LENGTH_SHORT).show()
+                    val intent = Intent(applicationContext, Bienvenida::class.java)
+                    intent.putExtra("Correo", user?.email)
                     startActivity(intent)
-                    guardar_sesion(task.result.user?.email.toString(), "Usuario/Contraseña")
+                    finish()
                 } else {
-                    Toast.makeText(
-                        applicationContext,
-                        "Usuario/Contrasenia incorrecto(s)",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(applicationContext, "Error en la autenticación con Firebase", Toast.LENGTH_LONG).show()
                 }
             }
     }
