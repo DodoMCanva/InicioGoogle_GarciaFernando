@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -31,10 +32,40 @@ class MainActivity : AppCompatActivity() {
 
         val mGoogleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        val account = GoogleSignIn.getLastSignedInAccount(this)
-        if (account != null) {
-            firebaseAuthWithGoogle(account)
+//        val account = GoogleSignIn.getLastSignedInAccount(this)
+//        if (account != null) {
+//            firebaseAuthWithGoogle(account)
+//        }
+
+        findViewById<Button>(R.id.btn_crearcuenta).setOnClickListener{
+            val intent = Intent(this, Registrar::class.java)
+            startActivity(intent)
+            finish()
         }
+
+        findViewById<Button>(R.id.btn_login).setOnClickListener{
+            val correo = findViewById<EditText>(R.id.etCorreo).text.toString()
+            val contrasena = findViewById<EditText>(R.id.etPassword).text.toString()
+
+            if (correo.isNotEmpty() && contrasena.isNotEmpty()) {
+                firebaseAuth.signInWithEmailAndPassword(correo, contrasena)
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            val user = firebaseAuth.currentUser
+                            val intent = Intent(this, Bienvenida::class.java)
+                            intent.putExtra("Correo", user?.email)
+                            intent.putExtra("Proveedor", "Firebase (Email/Password)")
+                            startActivity(intent)
+                            finish()
+                        } else {
+                            Toast.makeText(this, "Error de autenticación: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+            } else {
+                Toast.makeText(this, "Por favor, completa todos los campos", Toast.LENGTH_SHORT).show()
+            }
+        }
+
 
         findViewById<Button>(R.id.btnLoginGoogle).setOnClickListener {
             val signInIntent = mGoogleSignInClient.signInIntent
@@ -67,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(applicationContext, "Bienvenido ${user?.displayName}", Toast.LENGTH_SHORT).show()
                     val intent = Intent(applicationContext, Bienvenida::class.java)
                     intent.putExtra("Correo", user?.email)
+                    intent.putExtra("Proveedor", "Gmail")
                     startActivity(intent)
                     finish()
                 } else {
